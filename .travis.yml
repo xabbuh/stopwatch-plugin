@@ -1,5 +1,4 @@
 language: php
-
 sudo: false
 
 cache:
@@ -9,10 +8,6 @@ cache:
 env:
     global:
         - TEST_COMMAND="composer test"
-    matrix:
-        - SYMFONY_VERSION=3.0.*
-        - SYMFONY_VERSION=2.8.*
-        - SYMFONY_VERSION=2.7.*
 
 branches:
     except:
@@ -21,39 +16,47 @@ branches:
 matrix:
     fast_finish: true
     include:
-        # Test stable versions
+          # Minimum supported Symfony version with the latest PHP version
+        - php: 7.2
+          env: COMPOSER_FLAGS="--prefer-stable --prefer-lowest" SYMFONY_DEPRECATIONS_HELPER="weak"
+
+          # Test the latest stable release
         - php: 5.4
-          env: DEPENDENCIES=minimum COVERAGE=true TEST_COMMAND="composer test-ci" SYMFONY_VERSION="2.7.* henrikbjorn/phpspec-code-coverage:^1.0"
         - php: 5.5
         - php: 5.6
         - php: 7.0
-
-        # Test latest versions:
         - php: 7.1
-          env: DEPENDENCIES="symfony/lts:^3" SYMFONY_VERSION=3.0.*
-        - php: 7.1
-          env: DEPENDENCIES="dev" SYMFONY_VERSION=4.0.*
+        - php: 7.2
+          env: COVERAGE=true TEST_COMMAND="composer test-ci"
 
-        # Test alternative runtimes:
-        - php: hhvm
+          # Test LTS versions. This makes sure we do not use Symfony packages with version greater
+          # than 2 or 3 respectively. Read more at https://github.com/symfony/lts
+        - php: 7.2
+          env: DEPENDENCIES="symfony/lts:^2"
+        - php: 7.2
+          env: DEPENDENCIES="symfony/lts:^3"
+
+          # Latest commit to master
+        - php: 7.2
+          env: STABILITY="dev"
 
     allow_failures:
-        - php: 7.1
-          env: DEPENDENCIES="dev" SYMFONY_VERSION=4.0.*
+          # Dev-master is allowed to fail.
+        - env: STABILITY="dev"
 
 before_install:
-    - travis_retry composer self-update
-    - if [ "$DEPENDENCIES" = "minimum" ]; then COMPOSER_FLAGS="--prefer-stable --prefer-lowest"; fi;
-    - if [ "$DEPENDENCIES" = "dev" ]; then composer config minimum-stability dev; fi;
-    - if [[ $DEPENDENCIES == *"/"* ]]; then composer require --no-update $DEPENDENCIES; fi;
+    - if [[ $COVERAGE != true ]]; then phpenv config-rm xdebug.ini || true; fi
+    - if [[ -v $STABILITY ]]; then composer config minimum-stability $STABILITY; fi;
+    - if [[ -v $DEPENDENCIES ]]; then composer require --no-update $DEPENDENCIES; fi;
 
 install:
-    - travis_retry composer require symfony/symfony:${SYMFONY_VERSION} --no-update
-    - travis_retry composer update ${COMPOSER_FLAGS} --prefer-dist --no-interaction
+    # To be removed when this issue will be resolved: https://github.com/composer/composer/issues/5355
+    - if [[ "$COMPOSER_FLAGS" == *"--prefer-lowest"* ]]; then composer update --prefer-dist --no-interaction --prefer-stable --quiet; fi
+    - composer update ${COMPOSER_FLAGS} --prefer-dist --no-interaction
 
 script:
     - composer validate --strict --no-check-lock
-    - $TEST_COMMAND
+    - TEST_COMMAND
 
 after_success:
     - if [[ "$COVERAGE" = true ]]; then wget https://scrutinizer-ci.com/ocular.phar; fi
