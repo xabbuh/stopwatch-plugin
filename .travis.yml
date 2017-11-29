@@ -56,7 +56,7 @@ install:
 
 script:
     - composer validate --strict --no-check-lock
-    - TEST_COMMAND
+    - $TEST_COMMAND
 
 after_success:
     - if [[ "$COVERAGE" = true ]]; then wget https://scrutinizer-ci.com/ocular.phar; fi
